@@ -2,10 +2,12 @@ const express = require("express");
 const fs = require("fs");
 const router = express.Router();
 const AWS = require("aws-sdk");
+const dotenv = require("dotenv");
+dotenv.config();
 
 const s3 = new AWS.S3({
-    accessKeyId: "AKIA2UC3DUARPIFEPNHT",
-    secretAccessKey: "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",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_ID,
 });
 
 router.post("/registerUser", registerUser);
