@@ -1,9 +1,9 @@
+require('dotenv').config();
 const express = require("express");
 const AWS = require("aws-sdk");
 const fs = require("fs");
 const cors = require("cors");
 // const dotenv = require("dotenv");
-require('dotenv').config();
 
 const s3 = new AWS.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
