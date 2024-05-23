@@ -1,72 +1,77 @@
+const express = require("express");
 const AWS = require("aws-sdk");
 const fs = require("fs");
+const cors = require("cors");
+// const dotenv = require("dotenv");
+require('dotenv').config();
+
 const s3 = new AWS.S3({
-    accessKeyId: "AKIA2UC3DUARPIFEPNHT",
-    secretAccessKey: "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",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_ID,
+});
+const appRouter = require("./routes/appRouter");
+const connectDB = require("./db/connect_db");
+const User = require("./db/userModel");
+
+const app = express();
+connectDB();
+
+const directoryPath = "./uploads/uploadToDB";
+
+app.use(cors());
+app.use(express.json());
+app.use("/api", appRouter);
+
+app.listen(process.env.PORT, () => {
+    console.log(`server listening on port ${process.env.PORT}...`);
 });
 
-const uploadFile = (fileName, bucketName) => {
-    const fileContent = fs.readFileSync(fileName);
+///////////////////////////////////////////////////////TRACK DIRECTORY
 
-    const params = {
-        Bucket: bucketName,
-        Key: fileName,
-        Body: fileContent,
-    };
+fs.watch(directoryPath, async (eventType, filename) => {
+    if (eventType === "rename" && filename) {
+        const filePath = `${directoryPath}/${filename}`;
+        console.log(
+            `File ${filename} was added to the directory or removed from the directory.`
+        );
 
-    s3.upload(params, (err, data) => {
-        if (err) {
-            console.error("Error uploading file:", err);
+        const uid = filename.split(".")[0];
+        const userExists = await User.findOne({ uid });
+
+        if (userExists) {
+            uploadFileToS3(filePath);
         } else {
-            console.log(`File uploaded successfully. ${data.Location}`);
+            console.log(
+                `User with UID ${uid} does not exist. Deleting the file.`
+            );
+            fs.unlink(filePath, (err) => {
+                if (err) {
+                    console.log(err);
+                }
+            });
         }
-    });
-};
-
-// Usage
-// uploadFile("rootkey.csv", "ather");
-
-let retrievedFile = fs.createWriteStream("./uploads/output.csv");
-let params = {
-    Bucket: "ather",
-    Key: "rootkey.csv"
-}
-s3.getObject(params).createReadStream().pipe(retrievedFile);
+    }
+});
 
 
-
-// Directory to watch for changes
-const directoryPath = "./uploads";
-
-// Bucket name to upload files to
-const bucketName = "ather";
-
-// Function to upload a file to S3
 async function uploadFileToS3(filePath) {
     const fileStream = fs.createReadStream(filePath);
     const params = {
-        Bucket: bucketName,
+        Bucket: "ather",
         Key: filePath.split("/").pop(), // Use the file name as the key
         Body: fileStream,
+        Overwrite: true
     };
+
+    //check if file already exists or not
 
     try {
         const data = await s3.upload(params).promise();
         console.log("File uploaded successfully:", data.Location);
+        fs.unlink(filePath, (err) => {
+            console.log(err);
+        })
     } catch (err) {
         console.error("Error uploading file:", err);
     }
 }
-
-// Watch the directory for file changes
-fs.watch(directoryPath, (eventType, filename) => {
-    if (eventType === "rename" && filename) {
-        const filePath = `${directoryPath}/${filename}`;
-        console.log(`File ${filename} was added to the directory.`);
-
-        // Upload the file to S3
-        uploadFileToS3(filePath);
-    }
-});
-
-console.log(`Watching directory ${directoryPath} for file changes...`);
